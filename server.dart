@@ -22,7 +22,7 @@ Future main() async {
   ));
 
   Router router = Router();
-// Feature 2 The home screen should display a list of the questions that users have asked.
+//Feature 2 The home screen should display a list of the questions that users have asked.
   router.get('/questions', (Request request) async {
     var results =
         await connection.query("SELECT title, summary, names From questions");
@@ -32,48 +32,48 @@ Future main() async {
   });
 
 // Feature 3 clicking on title and displayin all contents
-  router.get('/questions', (Request request) async {
-    var results = await connection.query(
-        "SELECT title, summary, description, user_id ,names From questions");
-    var myList = results.toList();
-    print(myList);
-    return await Response.ok(jsonEncode(myList));
-  });
-
-  // Feature 1
-
   // router.get('/questions', (Request request) async {
-  //   var results = await connection.query("SELECT * FROM questions");
-  //   var row;
-  //   var myList = <Map>[];
-  //   for (row in results) {
-  //     myList.add({
-  //       "question_id": row[0],
-  //       "title": row[1],
-  //       "summary": row[2],
-  //       "description": row[3],
-  //       "user_id": row[4],
-  //       "date": DateTime.parse(row['date']),
-  //       "created_at": DateTime.parse(row['created_at'])
-  //     });
-  //     print(myList);
-  //   }
-
-  //   Map<String, dynamic> output = {
-  //     "status": "success",
-  //     "myList": myList,
-  //     "message": "Success, Gotten Details"
-  //   };
-  //   String json = jsonEncode(output);
-  //   print(json);
-
-  //   return Response.ok(json,
-  //       headers: {'Content-type': 'application/json'},
-  //       encoding: convert.Encoding.getByName('utf-8'));
-  //   // return Response.ok(jsonEncode(myList));
+  //   var load = await connection.query(
+  //       "SELECT title, summary, description, user_id ,names From questions");
+  //   var myList = load.toList();
+  //   print(myList);
+  //   return await Response.ok(jsonEncode(myList));
   // });
 
-  // await connection.close();
+  // Feature 1 Posting questions
+
+  router.post('/questions', (Request request) async {
+    var uri = await request.url;
+    Map<String, String> params = uri.queryParameters;
+    var title = params['title'];
+    var summary = params['summary'];
+    var description = params['description'];
+    var date = params['date'];
+    var created_at = params['created_at'];
+
+    await connection.query(
+        'INSERT into questions(title, summary, description, date, created_at) VALUES(?, ?, ?, ?, ?)',
+        [title, summary, description, date, created_at]);
+    print('Sucessfully Added');
+
+    return Response.ok(jsonEncode(params));
+  });
+
+  router.post('/answers', (Request request) async {
+    var uri = await request.url;
+    Map<String, String> load = uri.queryParameters;
+    var answer = load['answer'];
+    var question_id = load['question_id'];
+    var user_id = load['user_id'];
+    var date_answered = load['date_answered'];
+
+    await connection.query(
+        'INSERT into answers(answer, question_id, user_id, date_answered) VALUES(?, ?, ?, ?)',
+        [answer, question_id, user_id, date_answered]);
+    print('Done');
+
+    return Response.ok(jsonEncode(load));
+  });
 
   final server = await serve(
     router,
