@@ -2,15 +2,16 @@
 
 /* the simplest possible web server */
 
-import 'dart:io' show InternetAddress;
+import 'dart:io';
 import 'package:mysql1/mysql1.dart';
-import 'package:shelf/shelf.dart' show Request, Response;
-import 'package:shelf/shelf_io.dart' show serve;
-import 'package:shelf_router/shelf_router.dart' show Router;
+import 'package:shelf/shelf.dart';
+import 'package:shelf/shelf_io.dart';
+import 'package:shelf_router/shelf_router.dart';
 // import 'package:mysql_client/mysql_client.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'dart:convert' as convert;
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shelf_cors_headers/shelf_cors_headers.dart';
 
 Future main() async {
   final connection = await MySqlConnection.connect(ConnectionSettings(
@@ -24,23 +25,27 @@ Future main() async {
   Router router = Router();
 //Feature 2 The home screen should display a list of the questions that users have asked.
   router.get('/questions', (Request request) async {
-    var results =
-        await connection.query("SELECT title, summary, names From questions");
-    var myList = results.toList();
-    print(myList);
-    return await Response.ok(jsonEncode(myList));
+    print(request);
+    var results = await connection.query(
+        "SELECT title, summary, description, user_id, CAST(created_at AS char), CAST(date AS char), names FROM questions;");
+
+    // await connection.close();
+    List<dynamic> data = List.filled(0, 0, growable: true);
+
+    results.forEach((row) {
+      Map x = new Map();
+      for (int i = 0; i < results.fields.length; i++) {
+        x[results.fields[i].name] = row[i];
+      }
+      data.add(x);
+    });
+    print(data);
+    return await Response.ok(jsonEncode(data)
+        // headers: {'Content-type': 'application/json'},
+        // encoding: convert.Encoding.getByName('utf-8'),
+        );
   });
-
-// Feature 3 clicking on title and displayin all contents
-  // router.get('/questions', (Request request) async {
-  //   var load = await connection.query(
-  //       "SELECT title, summary, description, user_id ,names From questions");
-  //   var myList = load.toList();
-  //   print(myList);
-  //   return await Response.ok(jsonEncode(myList));
-  // });
-
-  // Feature 1 Posting questions
+  // Feature 1 Posting questions API
 
   router.post('/questions', (Request request) async {
     var uri = await request.url;
@@ -56,9 +61,38 @@ Future main() async {
         [title, summary, description, date, created_at]);
     print('Sucessfully Added');
 
+    await connection.close();
     return Response.ok(jsonEncode(params));
   });
 
+//login Page Api/authen
+  router.get('/users', (Request request) async {
+    var uri = await request.url;
+    Map<String, String> queryString = uri.queryParameters;
+    var name = queryString['name'];
+    var password = queryString['password'];
+    var results = await connection
+        .query('SELECT name, password FROM users WHERE name=?', [name]);
+    Map dim;
+    results.forEach((row) {
+      dim = new Map();
+      for (int i = 0; i < results.fields.length; i++) {
+        dim[results.fields[i].name] = row[i];
+      }
+    });
+
+    print(dim);
+    if (password == dim['password']) {
+      return Response.ok('You got it! ');
+    } else {
+      return Response.ok('Try again, this time think HARDER!');
+    }
+    // await connection.close();
+  });
+
+// END LOGIN AUTHEN/ API
+
+  //Answer Api
   router.post('/answers', (Request request) async {
     var uri = await request.url;
     Map<String, String> load = uri.queryParameters;
@@ -71,15 +105,51 @@ Future main() async {
         'INSERT into answers(answer, question_id, user_id, date_answered) VALUES(?, ?, ?, ?)',
         [answer, question_id, user_id, date_answered]);
     print('Done');
-
+    await connection.close();
     return Response.ok(jsonEncode(load));
   });
 
+// ANSWER POST MEHTOD API
+
+  router.get('/answers', (Request request) async {
+    print(request);
+    var results = await connection.query(
+        "SELECT answer, question_id, user_id, CAST(date_answered AS char) FROM answers;");
+
+    await connection.close();
+    List<dynamic> data = List.filled(0, 0, growable: true);
+
+    results.forEach((row) {
+      Map x = new Map();
+      for (int i = 0; i < results.fields.length; i++) {
+        x[results.fields[i].name] = row[i];
+      }
+      data.add(x);
+    });
+    print(data);
+    return await Response.ok(jsonEncode(data));
+  });
+
+  //END ANSWER GET METHOD API
+  final cascade = new Cascade().add(router);
+
+  const _headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': '*',
+  };
+
+  var handler = const Pipeline()
+      .addMiddleware(logRequests())
+      .addMiddleware(corsHeaders(headers: _headers))
+      .addHandler(cascade.handler);
+
   final server = await serve(
-    router,
+    handler,
     InternetAddress.anyIPv4,
     8080,
   );
+  server.autoCompress = true;
 
   print('Serving at http://${server.address.host}:${server.port}');
 }
