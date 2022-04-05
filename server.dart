@@ -7,7 +7,6 @@ import 'package:mysql1/mysql1.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart';
 import 'package:shelf_router/shelf_router.dart';
-// import 'package:mysql_client/mysql_client.dart';
 import 'dart:convert' as convert;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -23,9 +22,13 @@ Future main() async {
   ));
 
   Router router = Router();
+
 //Feature 2 The home screen should display a list of the questions that users have asked.
   router.get('/questions', (Request request) async {
     print(request);
+    try {} catch (e) {
+      print('Exception type $e');
+    }
     var results = await connection.query(
         "SELECT title, summary, description, user_id, CAST(created_at AS char), CAST(date AS char), names FROM questions;");
 
@@ -40,10 +43,7 @@ Future main() async {
       data.add(x);
     });
     print(data);
-    return await Response.ok(jsonEncode(data)
-        // headers: {'Content-type': 'application/json'},
-        // encoding: convert.Encoding.getByName('utf-8'),
-        );
+    return await Response.ok(jsonEncode(data));
   });
   // Feature 1 Posting questions API
 
@@ -57,15 +57,20 @@ Future main() async {
     var date = data['date'];
     var created_at = data['created_at'];
     var names = data['names'];
-
-    await connection.query(
-        'INSERT into questions(title, summary, description, date, created_at, names) VALUES(?, ?, ?, ?, ?,?)',
-        [title, summary, description, date, created_at, names]);
-    print('Sucessfully Added');
+    try {
+      await connection.query(
+          'INSERT into questions(title, summary, description, date, created_at, names) VALUES(?, ?, ?, ?, ?,?)',
+          [title, summary, description, date, created_at, names]);
+      print('Sucessfully Added');
+    } catch (e) {
+      print('Exception type $e');
+    }
 
     // await connection.close();
     return Response.ok(jsonEncode(data));
   });
+
+//**************************************************************************************************** */
 
 //login Page Api/authen
   router.post('/users', (Request request) async {
@@ -99,6 +104,8 @@ Future main() async {
 
 // END LOGIN AUTHEN/ API
 
+//**************************************************************************************************************************** */
+
   //Answer Api
   router.post('/answers', (Request request) async {
     var uri = await request.url;
@@ -115,6 +122,8 @@ Future main() async {
     await connection.close();
     return Response.ok(jsonEncode(load));
   });
+
+//************************************************************************************************************************************ */
 
 // ANSWER POST MEHTOD API
 
@@ -137,7 +146,8 @@ Future main() async {
     return await Response.ok(jsonEncode(data));
   });
 
-  //END ANSWER GET METHOD API
+  //END ANSWER GET METHOD API*******************************************************************************************************
+
   final cascade = new Cascade().add(router);
 
   const _headers = {
